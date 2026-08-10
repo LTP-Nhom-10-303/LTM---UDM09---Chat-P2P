@@ -10,7 +10,7 @@
 ## Thành viên nhóm
 | Cặp | Thành viên | Phụ trách |
 |---|---|---|
-| Cặp 1 | (Võ Anh Duy), (Trương Quang Hà)         | Networking & Protocol |
+| Cặp 1 | (Võ Anh Duy), (Trương Quang Hào)         | Networking & Protocol |
 | Cặp 2 | (Lê Gia Huy), (Nguyễn Đông Nam)         | GUI chính & Peer list / Avatar |
 | Cặp 3 | (Trần Thị Đài Trang), (Nguyễn Duy Nhất) | Reply, Forward, Emoji |
 
