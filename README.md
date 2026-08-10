@@ -1,4 +1,5 @@
 # UDM_09 — Chat P2P
+
 ## Mô tả
 - Toàn bộ chức năng của ứng dụng được thực hiện qua GUI.
 - Các client giao tiếp trực tiếp theo mô hình P2P, không dùng server trung tâm để chuyển tiếp tin nhắn.
