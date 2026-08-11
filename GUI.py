@@ -1,14 +1,3 @@
-"""
-UDM_09 - Chat P2P
-Giao diện đơn giản, code ngắn gọn (dùng widget tkinter chuẩn).
-
-Gồm: nút Kết nối, nút Ngắt kết nối, khung hiển thị tin nhắn,
-ô nhập tin nhắn + nút Gửi.
-
-Chưa gắn logic mạng thật - các hàm on_connect, on_disconnect, on_send
-hiện chỉ cập nhật giao diện, sau này thay bằng code socket thật.
-"""
-
 import tkinter as tk
 from tkinter import scrolledtext
 
