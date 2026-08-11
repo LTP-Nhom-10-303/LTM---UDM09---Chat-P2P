@@ -16,7 +16,7 @@
 | Cặp 3 | (Trần Thị Đài Trang), (Nguyễn Duy Nhất) | Reply, Forward, Emoji |
 
 ## Tiến độ
-- [ ] Kết nối P2P giữa 2 client
+- [x] Kết nối P2P giữa 2 client
 - [ ] Định dạng message chung (protocol)
 - [ ] Giao diện chính (danh sách peer, khung chat)
 - [ ] Hiển thị avatar
