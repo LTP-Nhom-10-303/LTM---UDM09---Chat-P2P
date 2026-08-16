@@ -4,7 +4,6 @@ from datetime import datetime
 import json
 import uuid
 
-# 1. TẦNG GIAO THỨC JSON (MESSAGE PROTOCOL)
 class MessageProtocol:
     @staticmethod
     def create_json_message(sender_name: str, content: str, reply_to: dict = None) -> str:
@@ -35,7 +34,6 @@ class MessageProtocol:
             print("[Lỗi Decode JSON]:", e)
             return None
 
-# 2. TẦNG GIAO DIỆN CHAT (GUI)
 class ChatWindowGUI:
     def __init__(self, root, my_name="Trương Quang Hòa", send_callback=None):
         self.root = root
