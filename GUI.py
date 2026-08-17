@@ -1,10 +1,15 @@
+import socket
+import threading
 import tkinter as tk
-from tkinter import scrolledtext
+from datetime import datetime
+from tkinter import scrolledtext, simpledialog, messagebox
 
 
 class P2PChatGUI:
     def __init__(self, root):
         self.root = root
+        self.sock = None          # socket đang dùng để gửi/nhận
+        self.server_sock = None   # socket lắng nghe (khi đóng vai server)
         root.title("Chat P2P")
         root.geometry("420x520")
 
@@ -39,8 +44,9 @@ class P2PChatGUI:
 
     # ---- Tiện ích ----
     def _print(self, text):
+        timestamp = datetime.now().strftime("%H:%M:%S")
         self.chat_area.config(state=tk.NORMAL)
-        self.chat_area.insert(tk.END, text + "\n")
+        self.chat_area.insert(tk.END, f"[{timestamp}] {text}\n")
         self.chat_area.config(state=tk.DISABLED)
         self.chat_area.see(tk.END)
 
@@ -53,20 +59,79 @@ class P2PChatGUI:
         self.status.config(text="Đã kết nối" if connected else "Chưa kết nối",
                             fg="green" if connected else "red")
 
-    # ---- Xử lý sự kiện (chưa gắn socket thật) ----
+    # ---- Kết nối: thử làm client trước, nếu peer chưa bật thì tự chuyển sang chờ (server) ----
     def on_connect(self):
-        self._print("Đang kết nối tới peer ...")
-        self._set_connected(True)
+        ip = simpledialog.askstring("Kết nối", "Nhập IP peer:", initialvalue="127.0.0.1")
+        if not ip:
+            return
+        port = simpledialog.askinteger("Kết nối", "Nhập port:", initialvalue=5000)
+        if not port:
+            return
+        self.connect_btn.config(state=tk.DISABLED)
+        threading.Thread(target=self._connect_thread, args=(ip, port), daemon=True).start()
+
+    def _connect_thread(self, ip, port):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(3)
+            s.connect((ip, port))
+            s.settimeout(None)
+            self.sock = s
+        except OSError:
+            # Peer chưa bật -> tự chuyển sang chế độ chờ kết nối tới
+            try:
+                self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.server_sock.bind(("0.0.0.0", port))
+                self.server_sock.listen(1)
+                self.root.after(0, self._print, f"Đang chờ peer kết nối tới cổng {port} ...")
+                self.sock, _ = self.server_sock.accept()
+            except OSError as e:
+                self.root.after(0, messagebox.showerror, "Lỗi kết nối", str(e))
+                self.root.after(0, lambda: self.connect_btn.config(state=tk.NORMAL))
+                return
+
+        self.root.after(0, self._print, "Đã kết nối với peer.")
+        self.root.after(0, self._set_connected, True)
+        threading.Thread(target=self._receive_loop, daemon=True).start()
+
+    def _receive_loop(self):
+        while self.sock:
+            try:
+                data = self.sock.recv(4096)
+            except OSError:
+                break
+            if not data:
+                break
+            self.root.after(0, self._print, f"Peer: {data.decode('utf-8', errors='replace')}")
+
+        if self.sock:  # peer đóng kết nối đột ngột
+            self.root.after(0, self._print, "Peer đã ngắt kết nối.")
+            self.root.after(0, self.on_disconnect)
 
     def on_disconnect(self):
+        for s in (self.sock, self.server_sock):
+            if s:
+                try:
+                    s.close()
+                except OSError:
+                    pass
+        self.sock = None
+        self.server_sock = None
         self._print("Đã ngắt kết nối.")
         self._set_connected(False)
 
     def on_send(self):
         text = self.msg_entry.get().strip()
-        if text:
+        if not text or not self.sock:
+            return
+        try:
+            self.sock.sendall(text.encode("utf-8"))
             self._print(f"Bạn: {text}")
             self.msg_entry.delete(0, tk.END)
+        except OSError as e:
+            messagebox.showerror("Lỗi gửi tin nhắn", str(e))
+            self.on_disconnect()
 
 
 if __name__ == "__main__":
