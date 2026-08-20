@@ -1,196 +1,225 @@
+import sys
+import json
 import socket
 import threading
-import tkinter as tk
-import json
-import uuid
 from datetime import datetime
-from tkinter import scrolledtext, simpledialog, messagebox
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLineEdit, QPushButton, QLabel, QListWidget, QListWidgetItem
+)
+from PySide6.QtCore import Signal, QObject, Qt
 
-# LỚP MESSAGE PROTOCOL 
+# 1. MESSAGE PROTOCOL LAYER
 class MessageProtocol:
     @staticmethod
-    def create_json_message(sender_name: str, content: str, reply_to: dict = None, is_forwarded: bool = False) -> str:
-        """
-        [ĐÓNG GÓI] Chuyển thông tin tin nhắn thành chuỗi JSON hỗ trợ UTF-8, Emoji, Reply, Forward
-        """
-        msg_dict = {
-            "type": "CHAT",
-            "msg_id": f"msg_{uuid.uuid4().hex[:6]}",
+    def create_chat_message(sender_name, avatar, content, reply_to=None):
+        """Tạo gói tin chuẩn JSON theo thiết kế giao thức Message Protocol"""
+        return {
+            "type": "CHAT_MSG",
+            "msg_id": f"msg_{int(datetime.now().timestamp() * 1000)}",
             "sender_name": sender_name,
-            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "sender_avatar": avatar,
             "content": content,
-            "reply_to": reply_to,           # Ví dụ: {"msg_id": "...", "content": "..."}
-            "is_forwarded": is_forwarded,
-            "avatar_base64": ""             # Dành cho tính năng Avatar
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "reply_to": reply_to
         }
-        return json.dumps(msg_dict, ensure_ascii=False)
 
     @staticmethod
-    def parse_json_message(raw_str: str) -> dict:
-        """
-        [GIẢI MÃ] Chuyển chuỗi JSON nhận từ Socket thành Python Dict
-        """
+    def serialize(msg_dict):
+        """Đóng gói dữ liệu Dict -> JSON string -> bytes"""
+        return (json.dumps(msg_dict) + "\n").encode('utf-8')
+
+    @staticmethod
+    def deserialize(data_str):
+        """Giải mã dữ liệu bytes/string -> Dict"""
         try:
-            return json.loads(raw_str)
+            return json.loads(data_str)
         except Exception:
             return None
 
-# LỚP GIAO DIỆN & KẾT NỐI P2P 
-class P2PChatGUI:
-    def __init__(self, root):
-        self.root = root
-        self.sock = None          # socket đang dùng để gửi/nhận
-        self.server_sock = None   # socket lắng nghe (khi đóng vai server)
-        self.my_name = "Trương Quang Hòa" # Tên người gửi
+# 2. NETWORK LAYER & SIGNAL HANDLER
+class NetworkSignals(QObject):
+    # Định nghĩa các Signal giao tiếp giữa Thread Mạng và Thread GUI trong PySide6
+    message_received = Signal(dict)
+    connection_status = Signal(str)
 
-        root.title("Chat P2P - UDM_09")
-        root.geometry("420x520")
+class PeerServerThread(threading.Thread):
+    def __init__(self, host, port, signals):
+        super().__init__()
+        self.host = host
+        self.port = port
+        self.signals = signals
+        self.daemon = True
+        self.running = True
 
-        #  Nút kết nối / ngắt kết nối 
-        top = tk.Frame(root, pady=10)
-        top.pack(fill=tk.X)
-
-        self.connect_btn = tk.Button(top, text="Kết nối", width=14, command=self.on_connect)
-        self.connect_btn.pack(side=tk.LEFT, padx=10)
-
-        self.disconnect_btn = tk.Button(top, text="Ngắt kết nối", width=14,
-                                         command=self.on_disconnect, state=tk.DISABLED)
-        self.disconnect_btn.pack(side=tk.LEFT)
-
-        self.status = tk.Label(root, text="Chưa kết nối", fg="red")
-        self.status.pack()
-
-        #  Khung hiển thị tin nhắn 
-        self.chat_area = scrolledtext.ScrolledText(root, state=tk.DISABLED, wrap=tk.WORD)
-        self.chat_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-
-        #  Ô nhập tin nhắn + nút Gửi 
-        bottom = tk.Frame(root, pady=10)
-        bottom.pack(fill=tk.X, padx=10)
-
-        self.msg_entry = tk.Entry(bottom, state=tk.DISABLED)
-        self.msg_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.msg_entry.bind("<Return>", lambda e: self.on_send())
-
-        self.send_btn = tk.Button(bottom, text="Gửi", width=8, command=self.on_send, state=tk.DISABLED)
-        self.send_btn.pack(side=tk.LEFT, padx=(5, 0))
-
-    #  Tiện ích hiển thị tin nhắn chuẩn định dạng Protocol 
-    def _print_message(self, sender_name, text, timestamp=None):
-        if not timestamp:
-            timestamp = datetime.now().strftime("%H:%M:%S")
-        self.chat_area.config(state=tk.NORMAL)
-        self.chat_area.insert(tk.END, f"[{timestamp}] {sender_name}: {text}\n")
-        self.chat_area.config(state=tk.DISABLED)
-        self.chat_area.see(tk.END)
-
-    def _set_connected(self, connected):
-        state = tk.NORMAL if connected else tk.DISABLED
-        self.msg_entry.config(state=state)
-        self.send_btn.config(state=state)
-        self.disconnect_btn.config(state=state)
-        self.connect_btn.config(state=tk.DISABLED if connected else tk.NORMAL)
-        self.status.config(text="Đã kết nối" if connected else "Chưa kết nối",
-                            fg="green" if connected else "red")
-
-    #  Thao tác kết nối 
-    def on_connect(self):
-        ip = simpledialog.askstring("Kết nối", "Nhập IP peer:", initialvalue="127.0.0.1")
-        if not ip:
-            return
-        port = simpledialog.askinteger("Kết nối", "Nhập port:", initialvalue=5000)
-        if not port:
-            return
-        self.connect_btn.config(state=tk.DISABLED)
-        threading.Thread(target=self._connect_thread, args=(ip, port), daemon=True).start()
-
-    def _connect_thread(self, ip, port):
+    def run(self):
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(3)
-            s.connect((ip, port))
-            s.settimeout(None)
-            self.sock = s
-        except OSError:
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server_socket.bind((self.host, self.port))
+            server_socket.listen(5)
+            self.signals.connection_status.emit(f"Server P2P đang lắng nghe tại {self.host}:{self.port}")
+
+            while self.running:
+                client, addr = server_socket.accept()
+                threading.Thread(target=self.handle_client, args=(client, addr), daemon=True).start()
+        except Exception as e:
+            self.signals.connection_status.emit(f"Lỗi Socket Server: {e}")
+
+    def handle_client(self, client, addr):
+        buffer = ""
+        while self.running:
             try:
-                self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self.server_sock.bind(("0.0.0.0", port))
-                self.server_sock.listen(1)
-                self.root.after(0, self._print_message, "Hệ thống", f"Đang chờ peer kết nối tới cổng {port} ...")
-                self.sock, _ = self.server_sock.accept()
-            except OSError as e:
-                self.root.after(0, messagebox.showerror, "Lỗi kết nối", str(e))
-                self.root.after(0, lambda: self.connect_btn.config(state=tk.NORMAL))
-                return
-
-        self.root.after(0, self._print_message, "Hệ thống", "Đã kết nối với peer.")
-        self.root.after(0, self._set_connected, True)
-        threading.Thread(target=self._receive_loop, daemon=True).start()
-
-    #  Nhận tin nhắn: Giải mã JSON từ Socket
-    def _receive_loop(self):
-        while self.sock:
-            try:
-                data = self.sock.recv(4096)
-            except OSError:
+                data = client.recv(1024).decode('utf-8')
+                if not data:
+                    break
+                buffer += data
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    msg_dict = MessageProtocol.deserialize(line)
+                    if msg_dict:
+                        self.signals.message_received.emit(msg_dict)
+            except Exception:
                 break
-            if not data:
-                break
-            
-            # GIẢI MÃ PROTOCOL JSON TẠI ĐÂY
-            raw_str = data.decode('utf-8', errors='replace')
-            msg_obj = MessageProtocol.parse_json_message(raw_str)
+        client.close()
 
-            if msg_obj:
-                sender = msg_obj.get("sender_name", "Peer")
-                content = msg_obj.get("content", "")
-                time_str = msg_obj.get("timestamp")
-                self.root.after(0, self._print_message, sender, content, time_str)
-            else:
-                # Trường hợp nhận dữ liệu thô cũ không qua JSON
-                self.root.after(0, self._print_message, "Peer", raw_str)
+# 3. MAIN GUI WINDOW (PYSIDE6)
+class ChatMainWindow(QMainWindow):
+    def __init__(self, user_name="Trương Quang Hòa", avatar="😎", port=9000, target_port=9001):
+        super().__init__()
+        self.user_name = user_name
+        self.avatar = avatar
+        self.port = port
+        self.target_port = target_port
+        self.replying_msg = None
 
-        if self.sock:
-            self.root.after(0, self._print_message, "Hệ thống", "Peer đã ngắt kết nối.")
-            self.root.after(0, self.on_disconnect)
+        self.init_ui()
+        self.init_network()
 
-    def on_disconnect(self):
-        for s in (self.sock, self.server_sock):
-            if s:
-                try:
-                    s.close()
-                except OSError:
-                    pass
-        self.sock = None
-        self.server_sock = None
-        self._print_message("Hệ thống", "Đã ngắt kết nối.")
-        self._set_connected(False)
+    def init_ui(self):
+        # 1. Thiết kế cửa sổ Chat chính
+        self.setWindowTitle(f"P2P Chat - {self.user_name} (Port: {self.port})")
+        self.resize(500, 600)
 
-    # Gửi tin nhắn: Đóng gói JSON trước khi gửi qua Socket 
-    def on_send(self):
-        text = self.msg_entry.get().strip()
-        if not text or not self.sock:
+        main_widget = QWidget()
+        layout = QVBoxLayout()
+
+        # Hiển thị trạng thái kết nối
+        self.lbl_status = QLabel("Trạng thái: Đang kết nối...")
+        self.lbl_status.setStyleSheet("color: gray; font-style: italic;")
+        layout.addWidget(self.lbl_status)
+
+        # 2. Khu vực hiển thị tin nhắn (QListWidget)
+        self.msg_list = QListWidget()
+        layout.addWidget(self.msg_list)
+
+        # Xem trước tin nhắn Reply
+        self.lbl_reply_preview = QLabel("")
+        self.lbl_reply_preview.setStyleSheet("background-color: #f0f0f0; border-left: 3px solid #007bff; padding: 4px;")
+        self.lbl_reply_preview.hide()
+        layout.addWidget(self.lbl_reply_preview)
+
+        # 3. Ô nhập Message & 4. Nút Send
+        input_layout = QHBoxLayout()
+        self.txt_input = QLineEdit()
+        self.txt_input.setPlaceholderText("Nhập nội dung tin nhắn...")
+        self.txt_input.returnPressed.connect(self.send_message)  # Gửi khi nhấn Enter
+
+        self.btn_send = QPushButton("Gửi")
+        self.btn_send.clicked.connect(self.send_message)  # 7. Xử lý sự kiện gửi Message
+
+        input_layout.addWidget(self.txt_input)
+        input_layout.addWidget(self.btn_send)
+        layout.addLayout(input_layout)
+
+        main_widget.setLayout(layout)
+        self.setCentralWidget(main_widget)
+
+    def init_network(self):
+        """8. Kết nối GUI với Protocol/Network Layer"""
+        self.signals = NetworkSignals()
+        self.signals.message_received.connect(self.on_message_received)
+        self.signals.connection_status.connect(self.lbl_status.setText)
+
+        # Chạy Server lắng nghe trên Thread riêng
+        self.server_thread = PeerServerThread("127.0.0.1", self.port, self.signals)
+        self.server_thread.start()
+
+    def send_message(self):
+        content = self.txt_input.text().strip()
+        if not content:
             return
+
+        # Tạo gói tin qua MessageProtocol
+        msg_dict = MessageProtocol.create_chat_message(
+            sender_name=self.user_name,
+            avatar=self.avatar,
+            content=content,
+            reply_to=self.replying_msg
+        )
+
+        # 5. Hiển thị tin nhắn gửi lên GUI
+        self.display_message(msg_dict, is_mine=True)
+
+        # Gửi dữ liệu qua Socket
+        threading.Thread(target=self._socket_send, args=(msg_dict,), daemon=True).start()
+
+        # Reset ô nhập
+        self.txt_input.clear()
+        self.clear_reply()
+
+    def _socket_send(self, msg_dict):
         try:
-            # ĐÓNG GÓI JSON PROTOCOL TẠI ĐÂY
-            json_payload = MessageProtocol.create_json_message(
-                sender_name=self.my_name,
-                content=text
-            )
-            
-            # Gửi chuỗi JSON qua Socket
-            self.sock.sendall(json_payload.encode("utf-8"))
-            
-            # Hiển thị tin nhắn lên khung chat của mình
-            self._print_message("Bạn", text)
-            self.msg_entry.delete(0, tk.END)
-        except OSError as e:
-            messagebox.showerror("Lỗi gửi tin nhắn", str(e))
-            self.on_disconnect()
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect(("127.0.0.1", self.target_port))
+            client.sendall(MessageProtocol.serialize(msg_dict))
+            client.close()
+        except Exception:
+            self.signals.connection_status.emit(f"Không thể kết nối tới Peer port {self.target_port}")
 
+    def on_message_received(self, msg_dict):
+        """5. Hiển thị tin nhắn nhận được"""
+        self.display_message(msg_dict, is_mine=False)
 
+    def display_message(self, msg_dict, is_mine=False):
+        """Hiển thị message kèm Avatar và Timestamp (6)"""
+        sender = msg_dict.get("sender_name")
+        avatar = msg_dict.get("sender_avatar", "👤")
+        content = msg_dict.get("content")
+        timestamp = msg_dict.get("timestamp")
+        reply_to = msg_dict.get("reply_to")
+
+        text = f"{avatar} <b>{sender}</b> [{timestamp}]:<br>{content}"
+        
+        if reply_to:
+            text = f"<i style='color:gray;'>↩ Trả lời [{reply_to.get('sender_name')}]: \"{reply_to.get('content')}\"</i><br>" + text
+
+        item = QListWidgetItem()
+        item_widget = QLabel(text)
+        item_widget.setTextFormat(Qt.TextFormat.RichText)
+        
+        # Căn lề tin nhắn: Phải (Tin gửi đi), Trái (Tin nhận)
+        if is_mine:
+            item_widget.setStyleSheet("background-color: #dcf8c6; padding: 8px; border-radius: 8px; margin: 4px;")
+            item_widget.setAlignment(Qt.AlignmentFlag.AlignRight)
+        else:
+            item_widget.setStyleSheet("background-color: #ffffff; padding: 8px; border-radius: 8px; margin: 4px;")
+            item_widget.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        self.msg_list.addItem(item)
+        self.msg_list.setItemWidget(item, item_widget)
+        self.msg_list.scrollToBottom()
+
+    def clear_reply(self):
+        self.replying_msg = None
+        self.lbl_reply_preview.hide()
+
+# 4. KHỞI CHẠY ỨNG DỤNG
 if __name__ == "__main__":
-    root = tk.Tk()
-    P2PChatGUI(root)
-    root.mainloop()
+    app = QApplication(sys.argv)
+    
+    # Khởi tạo giao diện chính
+    window = ChatMainWindow(user_name="Trương Quang Hòa", avatar="👨‍💻", port=9000, target_port=9001)
+    window.show()
+
+    sys.exit(app.exec())
