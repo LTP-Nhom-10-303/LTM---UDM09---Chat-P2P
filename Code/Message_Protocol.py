@@ -46,7 +46,7 @@ class P2PChatGUI:
         root.title("Chat P2P - UDM_09")
         root.geometry("420x520")
 
-        # ---- Nút kết nối / ngắt kết nối ----
+        #  Nút kết nối / ngắt kết nối 
         top = tk.Frame(root, pady=10)
         top.pack(fill=tk.X)
 
@@ -60,11 +60,11 @@ class P2PChatGUI:
         self.status = tk.Label(root, text="Chưa kết nối", fg="red")
         self.status.pack()
 
-        # ---- Khung hiển thị tin nhắn ----
+        #  Khung hiển thị tin nhắn 
         self.chat_area = scrolledtext.ScrolledText(root, state=tk.DISABLED, wrap=tk.WORD)
         self.chat_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-        # ---- Ô nhập tin nhắn + nút Gửi ----
+        #  Ô nhập tin nhắn + nút Gửi 
         bottom = tk.Frame(root, pady=10)
         bottom.pack(fill=tk.X, padx=10)
 
@@ -75,7 +75,7 @@ class P2PChatGUI:
         self.send_btn = tk.Button(bottom, text="Gửi", width=8, command=self.on_send, state=tk.DISABLED)
         self.send_btn.pack(side=tk.LEFT, padx=(5, 0))
 
-    # ---- Tiện ích hiển thị tin nhắn chuẩn định dạng Protocol ----
+    #  Tiện ích hiển thị tin nhắn chuẩn định dạng Protocol 
     def _print_message(self, sender_name, text, timestamp=None):
         if not timestamp:
             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -93,7 +93,7 @@ class P2PChatGUI:
         self.status.config(text="Đã kết nối" if connected else "Chưa kết nối",
                             fg="green" if connected else "red")
 
-    # ---- Thao tác kết nối ----
+    #  Thao tác kết nối 
     def on_connect(self):
         ip = simpledialog.askstring("Kết nối", "Nhập IP peer:", initialvalue="127.0.0.1")
         if not ip:
@@ -128,7 +128,7 @@ class P2PChatGUI:
         self.root.after(0, self._set_connected, True)
         threading.Thread(target=self._receive_loop, daemon=True).start()
 
-    # ---- Nhận tin nhắn: Giải mã JSON từ Socket ----
+    #  Nhận tin nhắn: Giải mã JSON từ Socket 
     def _receive_loop(self):
         while self.sock:
             try:
@@ -167,7 +167,7 @@ class P2PChatGUI:
         self._print_message("Hệ thống", "Đã ngắt kết nối.")
         self._set_connected(False)
 
-    # ---- Gửi tin nhắn: Đóng gói JSON trước khi gửi qua Socket ----
+    #  Gửi tin nhắn: Đóng gói JSON trước khi gửi qua Socket 
     def on_send(self):
         text = self.msg_entry.get().strip()
         if not text or not self.sock:
