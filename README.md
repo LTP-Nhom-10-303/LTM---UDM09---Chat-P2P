@@ -57,6 +57,7 @@ Mỗi tin nhắn trao đổi giữa các client có cấu trúc JSON như sau:
 
 ## Cấu trúc thư mục
 
+```
 LTM---UDM09---Chat-P2P/
 ├── Code/               # Toàn bộ mã nguồn ứng dụng
 │   ├── network/
@@ -70,6 +71,7 @@ LTM---UDM09---Chat-P2P/
 ├── Extra/              # Ảnh minh chứng demo, log, kết quả kiểm thử, dữ liệu phụ
 ├── README.md
 └── .gitignore
+```
 
 ## Yêu cầu môi trường
 
@@ -135,9 +137,9 @@ Các kịch bản kiểm thử được thực hiện, kết quả lưu tại th
 ## Tiến độ
 
 - [x] Kết nối P2P giữa 2 client
-- [ ] Định dạng message chung (protocol)
+- [x] Định dạng message chung (protocol)
 - [ ] Giao diện chính (danh sách peer, khung chat)
 - [ ] Hiển thị avatar
-- [ ] Chức năng Reply
-- [ ] Chức năng Forward
+- [x] Chức năng Reply
+- [x] Chức năng Forward
 - [ ] Emoji picker + hiển thị emoji
