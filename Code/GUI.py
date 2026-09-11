@@ -6,9 +6,6 @@ import tkinter as tk
 from tkinter import ttk
 from datetime import datetime
 
-# ============================================================
-#  THEME SÁNG - lấy cảm hứng màu từ ảnh tham khảo (indigo/mint)
-# ============================================================
 class Theme:
     BG          = "#f4f5fa"
     PANEL       = "#ffffff"
