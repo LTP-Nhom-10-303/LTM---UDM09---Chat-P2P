@@ -56,17 +56,18 @@ Mỗi tin nhắn trao đổi giữa các client có cấu trúc JSON như sau:
 | `timestamp` | Thời gian gửi, theo chuẩn UTC ISO 8601 |
 
 ## Cấu trúc thư mục
+
 LTM---UDM09---Chat-P2P/
-├── Code/ # Toàn bộ mã nguồn ứng dụng
-│ ├── network/
-│ │ ├── init.py
-│ │ ├── message_protocol.py # Định dạng và tạo message
-│ │ └── p2p_connection.py # Xử lý kết nối P2P qua socket
-│ ├── peer_list.py # Giao diện danh sách peer
-│ └── main_gui.py # Giao diện chính, điểm khởi chạy ứng dụng
-├── DOCX/ # Báo cáo dự án (Word)
-├── PPTX/ # Slide thuyết trình
-├── Extra/ # Ảnh minh chứng demo, log, kết quả kiểm thử, dữ liệu phụ
+├── Code/               # Toàn bộ mã nguồn ứng dụng
+│   ├── network/
+│   │   ├── __init__.py
+│   │   ├── message_protocol.py   # Định dạng và tạo message
+│   │   └── p2p_connection.py     # Xử lý kết nối P2P qua socket
+│   ├── peer_list.py    # Giao diện danh sách peer
+│   └── main_gui.py     # Giao diện chính, điểm khởi chạy ứng dụng
+├── DOCX/               # Báo cáo dự án (Word)
+├── PPTX/               # Slide thuyết trình
+├── Extra/              # Ảnh minh chứng demo, log, kết quả kiểm thử, dữ liệu phụ
 ├── README.md
 └── .gitignore
 
