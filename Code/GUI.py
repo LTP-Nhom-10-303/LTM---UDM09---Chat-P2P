@@ -15,6 +15,7 @@ class P2PChatGUI:
         self.server_sock = None
 
         self.my_name = "User"
+        self.last_peer_message = None  # Tin nhắn gần nhất của peer để Reply/Forward
 
         root.title("Chat P2P - UDM_09")
         root.geometry("500x600")
@@ -128,6 +129,40 @@ class P2PChatGUI:
             padx=(5, 0)
         )
 
+        # -------------------------------
+        # Nút Reply
+        # -------------------------------
+
+        self.reply_btn = tk.Button(
+            bottom,
+            text="↩ Reply",
+            width=8,
+            command=self.on_reply,
+            state=tk.DISABLED
+        )
+
+        self.reply_btn.pack(
+            side=tk.LEFT,
+            padx=(5, 0)
+        )
+
+        # -------------------------------
+        # Nút Forward
+        # -------------------------------
+
+        self.forward_btn = tk.Button(
+            bottom,
+            text="↪ Forward",
+            width=9,
+            command=self.on_forward,
+            state=tk.DISABLED
+        )
+
+        self.forward_btn.pack(
+            side=tk.LEFT,
+            padx=(5, 0)
+        )
+
     # =====================================================
     # HIỂN THỊ TIN NHẮN
     # =====================================================
@@ -159,6 +194,8 @@ class P2PChatGUI:
         self.msg_entry.config(state=state)
         self.send_btn.config(state=state)
         self.emoji_btn.config(state=state)
+        self.reply_btn.config(state=state)
+        self.forward_btn.config(state=state)
         self.disconnect_btn.config(state=state)
 
         if connected:
@@ -356,6 +393,14 @@ class P2PChatGUI:
                     ""
                 )
 
+                # Lưu tin nhắn peer gần nhất để Reply / Forward
+                self.last_peer_message = {
+                    "msg_id": message.get("msg_id"),
+                    "sender_name": sender,
+                    "content": content,
+                    "timestamp": message.get("timestamp")
+                }
+
                 timestamp = message.get(
                     "timestamp"
                 )
@@ -447,6 +492,7 @@ class P2PChatGUI:
 
         self.sock = None
         self.server_sock = None
+        self.last_peer_message = None
 
         self._print_message(
             "Hệ thống",
@@ -608,6 +654,113 @@ class P2PChatGUI:
             self.on_disconnect()
 
         window.destroy()
+
+
+    # =====================================================
+    # REPLY
+    # =====================================================
+
+    def on_reply(self):
+
+        if not self.sock:
+            messagebox.showwarning(
+                "Chưa kết nối",
+                "Bạn cần kết nối với peer trước."
+            )
+            return
+
+        if not self.last_peer_message:
+            messagebox.showwarning(
+                "Reply",
+                "Chưa có tin nhắn của peer để Reply."
+            )
+            return
+
+        original = self.last_peer_message
+
+        reply_text = simpledialog.askstring(
+            "Reply",
+            f"Reply tới:\n"
+            f"{original['sender_name']}: {original['content']}\n\n"
+            f"Nhập nội dung Reply:"
+        )
+
+        if not reply_text or not reply_text.strip():
+            return
+
+        reply_text = reply_text.strip()
+
+        reply_to = {
+            "msg_id": original["msg_id"],
+            "content": original["content"]
+        }
+
+        try:
+            json_message = MessageProtocol.create_json_message(
+                sender_name=self.my_name,
+                content=reply_text,
+                reply_to=reply_to
+            )
+
+            self.sock.sendall(json_message.encode("utf-8"))
+
+            self._print_message(
+                "Bạn",
+                f'↩ Reply "{original["content"]}": {reply_text}'
+            )
+
+        except OSError as e:
+            messagebox.showerror("Lỗi gửi Reply", str(e))
+            self.on_disconnect()
+
+    # =====================================================
+    # FORWARD
+    # =====================================================
+
+    def on_forward(self):
+
+        if not self.sock:
+            messagebox.showwarning(
+                "Chưa kết nối",
+                "Bạn cần kết nối với peer trước."
+            )
+            return
+
+        if not self.last_peer_message:
+            messagebox.showwarning(
+                "Forward",
+                "Chưa có tin nhắn của peer để Forward."
+            )
+            return
+
+        original = self.last_peer_message
+
+        confirm = messagebox.askyesno(
+            "Forward",
+            f"Bạn có muốn Forward tin nhắn này không?\n\n"
+            f"{original['sender_name']}: {original['content']}"
+        )
+
+        if not confirm:
+            return
+
+        try:
+            json_message = MessageProtocol.create_json_message(
+                sender_name=self.my_name,
+                content=original["content"],
+                is_forwarded=True
+            )
+
+            self.sock.sendall(json_message.encode("utf-8"))
+
+            self._print_message(
+                "Bạn",
+                f"↪ Forward: {original['content']}"
+            )
+
+        except OSError as e:
+            messagebox.showerror("Lỗi Forward", str(e))
+            self.on_disconnect()
 
 
 # =========================================================
