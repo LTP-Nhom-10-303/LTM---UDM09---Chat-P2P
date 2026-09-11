@@ -127,9 +127,6 @@ python Code/main_gui.py
 - [x] Chức năng Forward
 - [x] Emoji picker + hiển thị emoji
 
-## Kiểm thử
-
-*(Cập nhật khi có kết quả — bao gồm: test chức năng cơ bản, test dữ liệu không hợp lệ, test mất kết nối đột ngột, stress test với các mức tải khác nhau. Kết quả chi tiết lưu tại thư mục `Extra/`.)*
 
 ## Giới hạn
 
@@ -137,4 +134,4 @@ python Code/main_gui.py
 
 ## Video demo
 
-*(Cập nhật: dán link YouTube/Google Drive (chế độ Public hoặc Unlisted) sau khi quay video demo.)*
+*(link video)*
