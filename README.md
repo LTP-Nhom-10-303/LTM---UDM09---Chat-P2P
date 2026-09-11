@@ -76,7 +76,7 @@ LTM---UDM09---Chat-P2P/
 ## Yêu cầu môi trường
 
 - Python 3.10 trở lên
-- Thư viện GUI: *(cập nhật sau khi nhóm chốt — Tkinter có sẵn trong Python, hoặc PySide6 cần cài thêm)*
+- Thư viện GUI: Tkinter
 - Không yêu cầu cài đặt thêm gì khác ngoài Python chuẩn (module `socket`, `threading`, `json`, `uuid`, `datetime` đều có sẵn)
 
 ## Cài đặt
@@ -85,8 +85,6 @@ LTM---UDM09---Chat-P2P/
 git clone https://github.com/LTP-Nhom-10-303/LTM---UDM09---Chat-P2P.git
 cd LTM---UDM09---Chat-P2P
 
-# Nếu dùng PySide6:
-pip install PySide6
 ```
 
 ## Cấu hình
@@ -112,7 +110,7 @@ python main_gui.py
 ## Công nghệ sử dụng
 
 - Ngôn ngữ: Python 3.x
-- GUI: *(cập nhật: Tkinter hoặc PySide6)*
+- GUI: Tkinter
 - Networking: `socket` (TCP), `threading`
 - Định dạng dữ liệu: JSON
 
