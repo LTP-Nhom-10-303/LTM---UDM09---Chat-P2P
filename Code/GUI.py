@@ -3,7 +3,8 @@ import threading
 import tkinter as tk
 from datetime import datetime
 from tkinter import scrolledtext, simpledialog, messagebox
-
+from p2p_connection import P2PConnection
+from Message_protocol import MessageProtocol
 
 class P2PChatGUI:
     def __init__(self, root):
