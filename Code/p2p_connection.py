@@ -1,28 +1,28 @@
-"""
-p2p_connection.py
-Hỗ trợ Multi-Peer, Validation gói tin và Ghi Log ra file.
+""Peer-to-peer TCP networking layer for UDM_09.
+
+Each running application is both a TCP server and a TCP client.
+There is no central relay/server.
 """
 
-import json
-import logging
-import os
+from __future__ import annotations
+
 import socket
 import threading
+from dataclasses import dataclass, field
+from typing import Callable, Dict, Optional, Tuple
 
-# --- 1. Cấu hình Logging (Ghi log vào thư mục Extra/logs) ---
-LOG_DIR = os.path.join("Extra", "logs")
-os.makedirs(LOG_DIR, exist_ok=True)
-LOG_FILE = os.path.join(LOG_DIR, "app.log")
-
-logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    encoding="utf-8",
-)
+from protocol.message_protocol import MessageProtocol
 
 
-class P2PConnection:
+@dataclass
+class PeerConnection:
+    sock: socket.socket
+    address: Tuple[str, int]
+    peer_id: Optional[str] = None
+    peer_name: str = "Unknown"
+    avatar_base64: str = ""
+    send_lock: threading.Lock = field(default_factory=threading.Lock)
+    alive: bool = True
 
     def __init__(self, my_port, on_message=None, on_status=None):
         self.my_port = int(my_port)
