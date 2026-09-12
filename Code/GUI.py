@@ -1,776 +1,134 @@
-import socket
-import threading
-import tkinter as tk
-from tkinter import scrolledtext, simpledialog, messagebox
+import socket, threading, tkinter as tk
+from datetime import datetime
 
-from Message_protocol import MessageProtocol
+TIMEOUT_CONNECT, TIMEOUT_ACCEPT, MAX_LEN = 5, 10, 500
 
-
-class P2PChatGUI:
-
+class P2PChat:
     def __init__(self, root):
         self.root = root
+        root.title("P2PChat"); root.geometry("600x500")
+        self.sock = self.srv = None
 
-        self.sock = None
-        self.server_sock = None
+        top = tk.Frame(root); top.pack(fill="x", pady=4)
+        tk.Label(top, text="IP:").pack(side="left")
+        self.ip = tk.Entry(top, width=12); self.ip.insert(0, "127.0.0.1"); self.ip.pack(side="left")
+        tk.Label(top, text="Port:").pack(side="left")
+        self.port = tk.Entry(top, width=6); self.port.insert(0, "5000"); self.port.pack(side="left")
+        self.btn_conn = tk.Button(top, text="Kết nối", command=self.connect); self.btn_conn.pack(side="left", padx=4)
+        self.btn_disc = tk.Button(top, text="Ngắt", command=self.disconnect, state="disabled"); self.btn_disc.pack(side="left")
+        self.status = tk.Label(top, text="Chưa kết nối", fg="gray"); self.status.pack(side="left", padx=8)
 
-        self.my_name = "User"
-        self.last_peer_message = None  # Tin nhắn gần nhất của peer để Reply/Forward
+        self.chat = tk.Text(root, state="disabled", wrap="word"); self.chat.pack(fill="both", expand=True, padx=4)
 
-        root.title("Chat P2P - UDM_09")
-        root.geometry("500x600")
+        bottom = tk.Frame(root); bottom.pack(fill="x", pady=4)
+        self.entry = tk.Entry(bottom, state="disabled"); self.entry.pack(side="left", fill="x", expand=True, padx=4)
+        self.entry.bind("<Return>", lambda e: self.send())
+        self.btn_send = tk.Button(bottom, text="Gửi", command=self.send, state="disabled"); self.btn_send.pack(side="left", padx=4)
 
-        # =========================
-        # KHU VỰC KẾT NỐI
-        # =========================
+        root.protocol("WM_DELETE_WINDOW", self.close)
 
-        top = tk.Frame(root, pady=10)
-        top.pack(fill=tk.X)
+    # ---------- UI helpers ----------
+    def log(self, text, tag=""):
+        self.chat.config(state="normal")
+        prefix = f"[{datetime.now():%H:%M}] " if tag != "sys" else ""
+        self.chat.insert("end", f"{prefix}{text}\n")
+        self.chat.see("end")
+        self.chat.config(state="disabled")
 
-        self.connect_btn = tk.Button(
-            top,
-            text="Kết nối",
-            width=14,
-            command=self.on_connect
-        )
-        self.connect_btn.pack(side=tk.LEFT, padx=10)
+    def set_status(self, text, color):
+        self.status.config(text=text, fg=color)
 
-        self.disconnect_btn = tk.Button(
-            top,
-            text="Ngắt kết nối",
-            width=14,
-            command=self.on_disconnect,
-            state=tk.DISABLED
-        )
-        self.disconnect_btn.pack(side=tk.LEFT)
+    # ---------- Kết nối ----------
+    def connect(self):
+        ip, port_s = self.ip.get().strip(), self.port.get().strip()
+        if not ip or not port_s.isdigit():
+            self.log("⚠ IP/Port không hợp lệ.", "sys"); return
+        port = int(port_s)
+        self.btn_conn.config(state="disabled")
+        self.set_status("Đang kết nối...", "orange")
+        self.log(f"Đang kết nối tới {ip}:{port} ...", "sys")
+        threading.Thread(target=self._connect_worker, args=(ip, port), daemon=True).start()
 
-        # =========================
-        # TRẠNG THÁI
-        # =========================
-
-        self.status = tk.Label(
-            root,
-            text="Chưa kết nối",
-            fg="red"
-        )
-        self.status.pack()
-
-        # =========================
-        # KHUNG CHAT
-        # =========================
-
-        self.chat_area = scrolledtext.ScrolledText(
-            root,
-            state=tk.DISABLED,
-            wrap=tk.WORD
-        )
-
-        self.chat_area.pack(
-            fill=tk.BOTH,
-            expand=True,
-            padx=10,
-            pady=5
-        )
-
-        # =========================
-        # KHU VỰC NHẬP
-        # =========================
-
-        bottom = tk.Frame(root, pady=10)
-        bottom.pack(fill=tk.X, padx=10)
-
-        self.msg_entry = tk.Entry(
-            bottom,
-            state=tk.DISABLED
-        )
-
-        self.msg_entry.pack(
-            side=tk.LEFT,
-            fill=tk.X,
-            expand=True
-        )
-
-        self.msg_entry.bind(
-            "<Return>",
-            lambda event: self.on_send()
-        )
-
-        # =========================
-        # NÚT GỬI
-        # =========================
-
-        self.send_btn = tk.Button(
-            bottom,
-            text="Gửi",
-            width=8,
-            command=self.on_send,
-            state=tk.DISABLED
-        )
-
-        self.send_btn.pack(
-            side=tk.LEFT,
-            padx=(5, 0)
-        )
-
-        # =========================
-        # NÚT EMOJI
-        # =========================
-
-        self.emoji_btn = tk.Button(
-            bottom,
-            text="😊",
-            width=5,
-            command=self.show_emoji,
-            state=tk.DISABLED
-        )
-
-        self.emoji_btn.pack(
-            side=tk.LEFT,
-            padx=(5, 0)
-        )
-
-        # -------------------------------
-        # Nút Reply
-        # -------------------------------
-
-        self.reply_btn = tk.Button(
-            bottom,
-            text="↩ Reply",
-            width=8,
-            command=self.on_reply,
-            state=tk.DISABLED
-        )
-
-        self.reply_btn.pack(
-            side=tk.LEFT,
-            padx=(5, 0)
-        )
-
-        # -------------------------------
-        # Nút Forward
-        # -------------------------------
-
-        self.forward_btn = tk.Button(
-            bottom,
-            text="↪ Forward",
-            width=9,
-            command=self.on_forward,
-            state=tk.DISABLED
-        )
-
-        self.forward_btn.pack(
-            side=tk.LEFT,
-            padx=(5, 0)
-        )
-
-    # =====================================================
-    # HIỂN THỊ TIN NHẮN
-    # =====================================================
-
-    def _print_message(self, sender, content, timestamp=None):
-
-        if timestamp is None:
-            import datetime
-            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-
-        self.chat_area.config(state=tk.NORMAL)
-
-        self.chat_area.insert(
-            tk.END,
-            f"[{timestamp}] {sender}: {content}\n"
-        )
-
-        self.chat_area.config(state=tk.DISABLED)
-        self.chat_area.see(tk.END)
-
-    # =====================================================
-    # CẬP NHẬT TRẠNG THÁI
-    # =====================================================
-
-    def _set_connected(self, connected):
-
-        state = tk.NORMAL if connected else tk.DISABLED
-
-        self.msg_entry.config(state=state)
-        self.send_btn.config(state=state)
-        self.emoji_btn.config(state=state)
-        self.reply_btn.config(state=state)
-        self.forward_btn.config(state=state)
-        self.disconnect_btn.config(state=state)
-
-        if connected:
-
-            self.connect_btn.config(state=tk.DISABLED)
-
-            self.status.config(
-                text="Đã kết nối",
-                fg="green"
-            )
-
-        else:
-
-            self.connect_btn.config(state=tk.NORMAL)
-
-            self.status.config(
-                text="Chưa kết nối",
-                fg="red"
-            )
-
-    # =====================================================
-    # KẾT NỐI
-    # =====================================================
-
-    def on_connect(self):
-
-        ip = simpledialog.askstring(
-            "Kết nối",
-            "Nhập IP peer:",
-            initialvalue="127.0.0.1"
-        )
-
-        if not ip:
-            return
-
-        port = simpledialog.askinteger(
-            "Kết nối",
-            "Nhập port:",
-            initialvalue=5000
-        )
-
-        if not port:
-            return
-
-        self.my_name = simpledialog.askstring(
-            "Tên người dùng",
-            "Nhập tên của bạn:",
-            initialvalue="User"
-        )
-
-        if not self.my_name:
-            self.my_name = "User"
-
-        self.connect_btn.config(state=tk.DISABLED)
-
-        threading.Thread(
-            target=self._connect_thread,
-            args=(ip, port),
-            daemon=True
-        ).start()
-
-    # =====================================================
-    # THREAD KẾT NỐI
-    # =====================================================
-
-    def _connect_thread(self, ip, port):
-
+    def _connect_worker(self, ip, port):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-
-            # Thử làm CLIENT
-
-            s = socket.socket(
-                socket.AF_INET,
-                socket.SOCK_STREAM
-            )
-
-            s.settimeout(3)
-
+            s.settimeout(TIMEOUT_CONNECT)
             s.connect((ip, port))
-
             s.settimeout(None)
-
             self.sock = s
-
         except OSError:
-
-            # Nếu không kết nối được
-            # thì chuyển sang SERVER
-
+            s.close()
+            srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-
-                self.server_sock = socket.socket(
-                    socket.AF_INET,
-                    socket.SOCK_STREAM
-                )
-
-                self.server_sock.setsockopt(
-                    socket.SOL_SOCKET,
-                    socket.SO_REUSEADDR,
-                    1
-                )
-
-                self.server_sock.bind(
-                    ("0.0.0.0", port)
-                )
-
-                self.server_sock.listen(1)
-
-                self.root.after(
-                    0,
-                    self._print_message,
-                    "Hệ thống",
-                    f"Đang chờ peer kết nối tới cổng {port}..."
-                )
-
-                self.sock, address = self.server_sock.accept()
-
+                srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                srv.bind(("0.0.0.0", port)); srv.listen(1); srv.settimeout(TIMEOUT_ACCEPT)
+                self.srv = srv
+                self.root.after(0, self.log, f"Đang chờ peer tới cổng {port} ...", "sys")
+                conn, _ = srv.accept()
+                self.sock = conn
             except OSError as e:
+                srv.close(); self.srv = None
+                self.root.after(0, self._connect_failed, str(e)); return
+        self.root.after(0, self._connect_ok)
+        threading.Thread(target=self._recv_loop, daemon=True).start()
 
-                self.root.after(
-                    0,
-                    messagebox.showerror,
-                    "Lỗi kết nối",
-                    str(e)
-                )
+    def _connect_ok(self):
+        self.set_status("Đã kết nối", "green")
+        self.log("Kết nối thành công.", "sys")
+        for w in (self.entry, self.btn_send): w.config(state="normal")
+        self.btn_disc.config(state="normal")
 
-                self.root.after(
-                    0,
-                    lambda: self.connect_btn.config(
-                        state=tk.NORMAL
-                    )
-                )
+    def _connect_failed(self, err):
+        self.set_status("Thất bại", "red")
+        self.log(f"Kết nối thất bại: {err}", "sys")
+        self.btn_conn.config(state="normal")
 
-                return
-
-        # Kết nối thành công
-
-        self.root.after(
-            0,
-            self._print_message,
-            "Hệ thống",
-            "Đã kết nối với peer."
-        )
-
-        self.root.after(
-            0,
-            self._set_connected,
-            True
-        )
-
-        threading.Thread(
-            target=self._receive_loop,
-            daemon=True
-        ).start()
-
-    # =====================================================
-    # NHẬN DỮ LIỆU
-    # =====================================================
-
-    def _receive_loop(self):
-
+    def _recv_loop(self):
         while self.sock:
-
             try:
-
                 data = self.sock.recv(4096)
-
             except OSError:
-
                 break
-
-            if not data:
-                break
-
-            raw_data = data.decode(
-                "utf-8",
-                errors="replace"
-            )
-
-            # Giải mã JSON
-
-            message = MessageProtocol.parse_json_message(
-                raw_data
-            )
-
-            if message:
-
-                sender = message.get(
-                    "sender_name",
-                    "Peer"
-                )
-
-                content = message.get(
-                    "content",
-                    ""
-                )
-
-                # Lưu tin nhắn peer gần nhất để Reply / Forward
-                self.last_peer_message = {
-                    "msg_id": message.get("msg_id"),
-                    "sender_name": sender,
-                    "content": content,
-                    "timestamp": message.get("timestamp")
-                }
-
-                timestamp = message.get(
-                    "timestamp"
-                )
-
-                # Kiểm tra Reply
-
-                reply_to = message.get(
-                    "reply_to"
-                )
-
-                if reply_to:
-
-                    original_content = reply_to.get(
-                        "content",
-                        ""
-                    )
-
-                    display_text = (
-                        f"↩ Reply: \"{original_content}\"\n"
-                        f"   {content}"
-                    )
-
-                else:
-
-                    display_text = content
-
-                # Kiểm tra Forward
-
-                if message.get(
-                    "is_forwarded",
-                    False
-                ):
-
-                    display_text = (
-                        f"↪ Forward: {display_text}"
-                    )
-
-                self.root.after(
-                    0,
-                    self._print_message,
-                    sender,
-                    display_text,
-                    timestamp
-                )
-
-            else:
-
-                self.root.after(
-                    0,
-                    self._print_message,
-                    "Peer",
-                    raw_data
-                )
-
-        # Peer ngắt kết nối
-
+            if not data: break
+            text = data.decode("utf-8", errors="replace")
+            self.root.after(0, self.log, f"Peer: {text}")
         if self.sock:
+            self.root.after(0, self.log, "Peer đã ngắt kết nối.", "sys")
+            self.root.after(0, self.disconnect)
 
-            self.root.after(
-                0,
-                self._print_message,
-                "Hệ thống",
-                "Peer đã ngắt kết nối."
-            )
+    # ---------- Gửi ----------
+    def send(self):
+        text = self.entry.get()
+        if not text.strip(): return
+        if len(text) > MAX_LEN or not text.isprintable():
+            self.log("⚠ Tin nhắn không hợp lệ.", "sys"); return
+        if not self.sock:
+            self.log("⚠ Chưa kết nối.", "sys"); return
+        try:
+            self.sock.sendall(text.encode("utf-8"))
+        except OSError:
+            self.log("⚠ Gửi thất bại.", "sys"); self.disconnect(); return
+        self.entry.delete(0, "end")
+        self.log(f"Tôi: {text}")
 
-            self.root.after(
-                0,
-                self.on_disconnect
-            )
-
-    # =====================================================
-    # NGẮT KẾT NỐI
-    # =====================================================
-
-    def on_disconnect(self):
-
-        for s in (
-            self.sock,
-            self.server_sock
-        ):
-
+    # ---------- Ngắt kết nối ----------
+    def disconnect(self):
+        for s in (self.sock, self.srv):
             if s:
+                try: s.close()
+                except OSError: pass
+        self.sock = self.srv = None
+        self.set_status("Chưa kết nối", "gray")
+        self.log("Đã ngắt kết nối.", "sys")
+        for w in (self.entry, self.btn_send): w.config(state="disabled")
+        self.btn_disc.config(state="disabled")
+        self.btn_conn.config(state="normal")
+
+    def close(self):
+        self.disconnect(); self.root.destroy()
 
-                try:
-                    s.close()
-
-                except OSError:
-                    pass
-
-        self.sock = None
-        self.server_sock = None
-        self.last_peer_message = None
-
-        self._print_message(
-            "Hệ thống",
-            "Đã ngắt kết nối."
-        )
-
-        self._set_connected(False)
-
-    # =====================================================
-    # GỬI TIN NHẮN
-    # =====================================================
-
-    def on_send(self):
-
-        text = self.msg_entry.get().strip()
-
-        if not text:
-            return
-
-        if not self.sock:
-            return
-
-        try:
-
-            # Đóng gói thành JSON
-
-            json_message = MessageProtocol.create_json_message(
-                sender_name=self.my_name,
-                content=text
-            )
-
-            # Gửi JSON
-
-            self.sock.sendall(
-                json_message.encode("utf-8")
-            )
-
-            # Hiển thị bên mình
-
-            self._print_message(
-                "Bạn",
-                text
-            )
-
-            self.msg_entry.delete(
-                0,
-                tk.END
-            )
-
-        except OSError as e:
-
-            messagebox.showerror(
-                "Lỗi gửi tin nhắn",
-                str(e)
-            )
-
-            self.on_disconnect()
-
-    # =====================================================
-    # HIỂN THỊ EMOJI
-    # =====================================================
-
-    def show_emoji(self):
-
-        emoji_window = tk.Toplevel(
-            self.root
-        )
-
-        emoji_window.title(
-            "Chọn Emoji"
-        )
-
-        emoji_window.geometry(
-            "300x300"
-        )
-
-        emojis = [
-            "😀",
-            "😂",
-            "😍",
-            "😊",
-            "😢",
-            "😡",
-            "👍",
-            "👎",
-            "❤️",
-            "🎉"
-        ]
-
-        tk.Label(
-            emoji_window,
-            text="Chọn Emoji",
-            font=("Arial", 14)
-        ).pack(pady=10)
-
-        frame = tk.Frame(
-            emoji_window
-        )
-
-        frame.pack()
-
-        for index, emoji in enumerate(emojis):
-
-            button = tk.Button(
-                frame,
-                text=emoji,
-                font=("Arial", 18),
-                width=4,
-                command=lambda e=emoji:
-                self.select_emoji(e, emoji_window)
-            )
-
-            button.grid(
-                row=index // 2,
-                column=index % 2,
-                padx=5,
-                pady=5
-            )
-
-    # =====================================================
-    # CHỌN EMOJI
-    # =====================================================
-
-    def select_emoji(self, emoji, window):
-
-        if not self.sock:
-
-            messagebox.showwarning(
-                "Chưa kết nối",
-                "Bạn cần kết nối với peer trước."
-            )
-
-            window.destroy()
-            return
-
-        try:
-
-            json_message = MessageProtocol.create_json_message(
-                sender_name=self.my_name,
-                content=emoji
-            )
-
-            self.sock.sendall(
-                json_message.encode("utf-8")
-            )
-
-            self._print_message(
-                "Bạn",
-                emoji
-            )
-
-        except OSError as e:
-
-            messagebox.showerror(
-                "Lỗi gửi Emoji",
-                str(e)
-            )
-
-            self.on_disconnect()
-
-        window.destroy()
-
-
-    # =====================================================
-    # REPLY
-    # =====================================================
-
-    def on_reply(self):
-
-        if not self.sock:
-            messagebox.showwarning(
-                "Chưa kết nối",
-                "Bạn cần kết nối với peer trước."
-            )
-            return
-
-        if not self.last_peer_message:
-            messagebox.showwarning(
-                "Reply",
-                "Chưa có tin nhắn của peer để Reply."
-            )
-            return
-
-        original = self.last_peer_message
-
-        reply_text = simpledialog.askstring(
-            "Reply",
-            f"Reply tới:\n"
-            f"{original['sender_name']}: {original['content']}\n\n"
-            f"Nhập nội dung Reply:"
-        )
-
-        if not reply_text or not reply_text.strip():
-            return
-
-        reply_text = reply_text.strip()
-
-        reply_to = {
-            "msg_id": original["msg_id"],
-            "content": original["content"]
-        }
-
-        try:
-            json_message = MessageProtocol.create_json_message(
-                sender_name=self.my_name,
-                content=reply_text,
-                reply_to=reply_to
-            )
-
-            self.sock.sendall(json_message.encode("utf-8"))
-
-            self._print_message(
-                "Bạn",
-                f'↩ Reply "{original["content"]}": {reply_text}'
-            )
-
-        except OSError as e:
-            messagebox.showerror("Lỗi gửi Reply", str(e))
-            self.on_disconnect()
-
-    # =====================================================
-    # FORWARD
-    # =====================================================
-
-    def on_forward(self):
-
-        if not self.sock:
-            messagebox.showwarning(
-                "Chưa kết nối",
-                "Bạn cần kết nối với peer trước."
-            )
-            return
-
-        if not self.last_peer_message:
-            messagebox.showwarning(
-                "Forward",
-                "Chưa có tin nhắn của peer để Forward."
-            )
-            return
-
-        original = self.last_peer_message
-
-        confirm = messagebox.askyesno(
-            "Forward",
-            f"Bạn có muốn Forward tin nhắn này không?\n\n"
-            f"{original['sender_name']}: {original['content']}"
-        )
-
-        if not confirm:
-            return
-
-        try:
-            json_message = MessageProtocol.create_json_message(
-                sender_name=self.my_name,
-                content=original["content"],
-                is_forwarded=True
-            )
-
-            self.sock.sendall(json_message.encode("utf-8"))
-
-            self._print_message(
-                "Bạn",
-                f"↪ Forward: {original['content']}"
-            )
-
-        except OSError as e:
-            messagebox.showerror("Lỗi Forward", str(e))
-            self.on_disconnect()
-
-
-# =========================================================
-# CHẠY CHƯƠNG TRÌNH
-# =========================================================
 
 if __name__ == "__main__":
-
     root = tk.Tk()
-
-    app = P2PChatGUI(root)
-
+    P2PChat(root)
     root.mainloop()
