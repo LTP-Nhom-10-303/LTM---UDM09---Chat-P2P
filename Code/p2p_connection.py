@@ -24,31 +24,32 @@ class PeerConnection:
     send_lock: threading.Lock = field(default_factory=threading.Lock)
     alive: bool = True
 
-    def __init__(self, my_port, on_message=None, on_status=None):
-        self.my_port = int(my_port)
+    
+class P2PConnection:
+    def __init__(
+        self,
+        peer_id: str,
+        peer_name: str,
+        port: int = 5000,
+        avatar_base64: str = "",
+        on_message: Optional[Callable[[str, dict], None]] = None,
+        on_peer_status: Optional[Callable[[dict], None]] = None,
+        on_error: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        self.peer_id = peer_id
+        self.peer_name = peer_name
+        self.port = port
+        self.avatar_base64 = avatar_base64
         self.on_message = on_message
-        self.on_status = on_status
+        self.on_peer_status = on_peer_status
+        self.on_error = on_error
 
-        # Quản lý MULTI-PEER: Dùng dict để lưu nhiều kết nối {address_str: socket}
-        self.peers = {}
-        self.listener_socket = None
-        self._lock = threading.Lock()
-
-    def start_listening(self):
-        threading.Thread(target=self._listen_loop, daemon=True).start()
-
-    def _listen_loop(self):
-        try:
-            self.listener_socket = socket.socket(
-                socket.AF_INET, socket.SOCK_STREAM
-            )
-            self.listener_socket.setsockopt(
-                socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
-            )
-            self.listener_socket.bind(("0.0.0.0", self.my_port))
-            self.listener_socket.listen(5)  # Hỗ trợ hàng chờ nhiều kết nối
-            self._log_and_notify(
-                f"Đang lắng nghe kết nối ở port {self.my_port}..."
+        self._server: Optional[socket.socket] = None
+        self._accept_thread: Optional[threading.Thread] = None
+        self._running = False
+        self._connections: Dict[str, PeerConnection] = {}
+        self._connections_lock = threading.RLock()
+        self._unnamed_connections: set[PeerConnection] = set()
             )
         except Exception as e:
             self._log_and_notify(
