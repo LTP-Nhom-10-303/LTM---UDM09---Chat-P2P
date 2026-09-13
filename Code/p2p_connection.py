@@ -51,18 +51,21 @@ class P2PConnection:
         self._connections_lock = threading.RLock()
         self._unnamed_connections: set[PeerConnection] = set()
             )
-        except Exception as e:
-            self._log_and_notify(
-                f"Lỗi mở port {self.my_port}: {e}", level="error"
-            )
+        
+        def start(self) -> None:
+        if self._running:
             return
-
-        while True:
-            try:
-                conn, addr = self.listener_socket.accept()
-            except OSError:
-                break
-
+        self._server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._server.bind(("0.0.0.0", self.port))
+        self._server.listen(20)
+        self._server.settimeout(1.0)
+        self._running = True
+        self._accept_thread = threading.Thread(
+            target=self._accept_loop, name="accept-loop", daemon=True
+        )
+        self._accept_thread.start()
+        
             peer_addr = f"{addr[0]}:{addr[1]}"
             with self._lock:
                 self.peers[peer_addr] = conn
