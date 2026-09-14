@@ -1,47 +1,40 @@
-import socket
-import threading
-import tkinter as tk
+from __future__ import annotations
+
 import json
 import uuid
 from datetime import datetime
-from tkinter import scrolledtext, simpledialog, messagebox
+from typing import Any, Dict, List, Optional, Tuple
 
-# LỚP MESSAGE PROTOCOL 
+
 class MessageProtocol:
+    PROTOCOL_VERSION = 1
+
     @staticmethod
-    def create_json_message(sender_name: str, content: str, reply_to: dict = None, is_forwarded: bool = False) -> str:
-        """
-        [ĐÓNG GÓI] Chuyển thông tin tin nhắn thành chuỗi JSON hỗ trợ UTF-8, Emoji, Reply, Forward
-        """
-        msg_dict = {
-            "type": "CHAT",
-            "msg_id": f"msg_{uuid.uuid4().hex[:6]}",
+    def new_id(prefix: str = "msg") -> str:
+        return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+    @staticmethod
+    def now() -> str:
+        return datetime.now().strftime("%H:%M:%S")
+
+    @staticmethod
+    def _base(
+        msg_type: str,
+        sender_id: str,
+        sender_name: str,
+        content: str = "",
+        avatar_base64: str = "",
+    ) -> Dict[str, Any]:
+        return {
+            "version": MessageProtocol.PROTOCOL_VERSION,
+            "type": msg_type,
+            "msg_id": MessageProtocol.new_id(),
+            "sender_id": sender_id,
             "sender_name": sender_name,
-            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "timestamp": MessageProtocol.now(),
             "content": content,
-            "reply_to": reply_to,           # Ví dụ: {"msg_id": "...", "content": "..."}
-            "is_forwarded": is_forwarded,
-            "avatar_base64": ""             # Dành cho tính năng Avatar
+            "avatar_base64": avatar_base64,
         }
-        return json.dumps(msg_dict, ensure_ascii=False)
-
-    @staticmethod
-    def parse_json_message(raw_str: str) -> dict:
-        """
-        [GIẢI MÃ] Chuyển chuỗi JSON nhận từ Socket thành Python Dict
-        """
-        try:
-            return json.loads(raw_str)
-        except Exception:
-            return None
-
-# LỚP GIAO DIỆN & KẾT NỐI P2P 
-class P2PChatGUI:
-    def __init__(self, root):
-        self.root = root
-        self.sock = None          # socket đang dùng để gửi/nhận
-        self.server_sock = None   # socket lắng nghe (khi đóng vai server)
-        self.my_name = "Trương Quang Hòa" # Tên người gửi
 
         root.title("Chat P2P - UDM_09")
         root.geometry("420x520")
