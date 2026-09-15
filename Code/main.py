@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import simpledialog, messagebox
 import sys
 
-from gui.chat_gui import ChatGUI
+from GUI.chat_gui import ChatGUI
 
 
 def main():
