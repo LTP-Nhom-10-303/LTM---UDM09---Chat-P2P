@@ -1,0 +1,3 @@
+# Pillow được dùng để hiển thị avatar (ảnh) trong Peer List.
+Pillow>=10.0.0
+# Python 3.10+ và Tkinter (có sẵn cùng Python) là đủ cho phần còn lại.
