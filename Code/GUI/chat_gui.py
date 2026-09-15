@@ -12,10 +12,10 @@ from typing import Dict, List, Optional
 
 from PIL import Image, ImageTk
 
-from gui.forward import build_forward_message
-from gui.peer_list import PeerList
-from gui.peer_manager import PeerManager
-from gui.reply_emoji import EMOJIS, reply_preview
+from Gui.forward import build_forward_message
+from Gui.peer_list import PeerList
+from Gui.peer_manager import PeerManager
+from Gui.reply_emoji import EMOJIS, reply_preview
 from network.p2p_connection import P2PConnection
 from protocol.message_protocol import MessageProtocol
 
