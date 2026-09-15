@@ -112,7 +112,7 @@ python Code/main_gui.py
 
 ## Công nghệ sử dụng
 
-- Ngôn ngữ: Python 3.x
+- Ngôn ngữ: Python 3.11.x
 - GUI: *(cập nhật: Tkinter hoặc PySide6)*
 - Networking: `socket` (TCP), `threading`
 - Định dạng dữ liệu: JSON
