@@ -28,25 +28,6 @@ class PeerList(tk.Frame):
         self.list_frame = tk.Frame(self)
         self.list_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-    def upsert_peer(self, peer_id, name, online, address=""):
-        current = self.peers.get(peer_id, {})
-        current.update({"name": name, "online": online, "address": address})
-        current.setdefault("avatar_b64", None)
-        self.peers[peer_id] = current
-        self.show_peers()
-
-    def update_peer_status(self, peer_id, online):
-        if peer_id in self.peers and self.peers[peer_id].get("online") != online:
-            self.peers[peer_id]["online"] = online
-            self.show_peers()
-
-    def remove_peer(self, peer_id):
-        self.peers.pop(peer_id, None)
-        self.avatar_images.pop(peer_id, None)
-        row = self.rows.pop(peer_id, None)
-        if row:
-            row["frame"].destroy()
-
     def sync_from_peer_manager(self, peers: dict):
         new = {}
         for peer_id, info in peers.items():
