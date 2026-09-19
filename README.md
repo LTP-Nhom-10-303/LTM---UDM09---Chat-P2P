@@ -59,37 +59,67 @@ Mỗi tin nhắn trao đổi giữa các client có cấu trúc JSON như sau:
 
 ```
 LTM---UDM09---Chat-P2P/
-├── Code/                     # Toàn bộ mã nguồn ứng dụng
+│
+├── Code/            # Toàn bộ mã nguồn ứng dụng
+│   ├── GUI/
+│   │   ├── __init__.py
+│   │   ├── chat_gui.py
+│   │   ├── forward.py
+│   │   ├── peer_list.py  # Giao diện danh sách peer
+│   │   ├── peer_manager.py
+│   │   └── reply_emoji.py
+│   │
+│   ├── assets/
+│   │   └── avatars/
+│   │
 │   ├── network/
 │   │   ├── __init__.py
-│   │   ├── message_protocol.py  # Định dạng và tạo message
-│   │   └── p2p_connection.py    # Xử lý kết nối P2P qua socket
-│   ├── peer_list.py          # Giao diện danh sách peer
-│   └── main_gui.py           # Giao diện chính, điểm khởi chạy ứng dụng
-├── DOCX/                     # Báo cáo dự án (Word)
-├── PPTX/                     # Slide thuyết trình
-├── Extra/                    # Ảnh minh chứng demo, log, kết quả kiểm thử, dữ liệu phụ
-├── README.md
-└── .gitignore
+│   │   └── p2p_connection.py  # Xử lý kết nối P2P qua socket
+│   │
+│   ├── protocol/
+│   │   ├── __init__.py
+│   │   └── message_protocol.py  # Định dạng và tạo message
+│   │
+│   ├── .gitignore
+│   ├── Reply.py
+│   ├── main.py    # Giao diện chính, điểm khởi chạy ứng dụng
+│   ├── requirements.txt
+│   └── run.bat
+│
+├── DOCX/  # Báo cáo dự án (Word)
+│
+├── Extra/ # Ảnh minh chứng demo, log, kết quả kiểm thử, dữ liệu phụ
+│
+├── PPTX/  # Slide thuyết trình
+│
+└── README.md
 ```
 
 ## Yêu cầu môi trường
 
 - Python 3.10 trở lên
-- Thư viện GUI: *(cập nhật sau khi nhóm chốt — Tkinter có sẵn trong Python, hoặc PySide6 cần cài thêm)*
+- Thư viện GUI: Tkinter được sử dụng để xây dựng giao diện người dùng và được tích hợp sẵn trong Python.
+- Pillow: dùng để xử lý và hiển thị hình ảnh/avatar.
 - Không yêu cầu cài đặt thêm gì khác ngoài Python chuẩn (module `socket`, `threading`, `json`, `uuid`, `datetime` đều có sẵn)
 
-Nếu dùng PySide6, cài bằng lệnh:
+Nếu dùng Tkinter, cài bằng lệnh:
 ```bash
-pip install PySide6
+pip install -r Code/requirements.txt
+```
+Hoặc cài trực tiếp Pillow:
+```bash
+pip install Pillow
 ```
 
 ## Cấu hình
 
 Khi khởi chạy ứng dụng, người dùng cần nhập:
 
+- **Tên người dùng**: tên hiển thị trong ứng dụng chat.
 - **Port cá nhân**: cổng mà máy mình sẽ lắng nghe kết nối đến từ các peer khác (ví dụ `8000`)
 - **IP và port của peer**: địa chỉ IP và cổng của người muốn kết nối tới (ví dụ `192.168.1.5:8001`)
+
+Sau khi ứng dụng khởi động, người dùng có thể thực hiện kết nối với các peer khác thông qua địa chỉ IP và Port của peer.
 
 Các máy cần **cùng chung mạng LAN/Wifi** để có thể kết nối trực tiếp với nhau qua địa chỉ IP nội bộ.
 
@@ -100,20 +130,23 @@ Các máy cần **cùng chung mạng LAN/Wifi** để có thể kết nối tr�
 git clone https://github.com/LTP-Nhom-10-303/LTM---UDM09---Chat-P2P.git
 cd LTM---UDM09---Chat-P2P
 ```
-2. *(Nếu dùng PySide6)* Cài thư viện cần thiết:
+2. Cài thư viện cần thiết:
 ```bash
-pip install PySide6
+pip install -r Code/requirements.txt
 ```
 3. Chạy ứng dụng:
 ```bash
-python Code/main_gui.py
+python Code/main.py
 ```
-4. Nhập port cá nhân, bấm **Mở Lắng Nghe**, sau đó nhập IP và port của peer muốn kết nối, bấm **Kết Nối**.
+4. Khi chương trình khởi động:
+- Nhập **tên người dùng**.
+- Nhập **port cá nhân**.
+- Sau khi vào giao diện chat, nhập **IP** và **port của peer** muốn kết nối.
 
 ## Công nghệ sử dụng
 
 - Ngôn ngữ: Python 3.11.x
-- GUI: *(cập nhật: Tkinter hoặc PySide6)*
+- GUI: **Tkinter**
 - Networking: `socket` (TCP), `threading`
 - Định dạng dữ liệu: JSON
 
