@@ -7,7 +7,7 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Callable
 
-EMOJI_LIST = [
+EMOJIS = [
     "😀", "😂", "😍", "😊", "😢", "😡", "👍", "👎",
     "❤️", "🎉", "💯", "👏", "🔥", "🙏", "😎", "🤔",
     "😴", "🥳", "😱", "🤝",
@@ -27,11 +27,14 @@ def show_emoji_picker(anchor_widget: tk.Widget, on_pick: Callable[[str], None]) 
     frame.pack()
 
     cols = 5
-    for i, emo in enumerate(EMOJI_LIST):
+    for i, emo in enumerate(EMOJIS):
         r, c = divmod(i, cols)
         btn = tk.Button(
-            frame, text=emo, font=("Segoe UI Emoji", 14),
-            relief="flat", bg="white",
+            frame,
+            text=emo,
+            font=("Segoe UI Emoji", 14),
+            relief="flat",
+            bg="white",
             command=lambda e=emo: (on_pick(e), popup.destroy()),
         )
         btn.grid(row=r, column=c, padx=2, pady=2)
@@ -41,3 +44,12 @@ def show_emoji_picker(anchor_widget: tk.Widget, on_pick: Callable[[str], None]) 
 
     popup.bind("<FocusOut>", _close_on_focus_out)
     popup.focus_set()
+
+
+def reply_preview(message: dict) -> dict:
+    """Tạo dữ liệu preview cho message được Reply."""
+    return {
+        "sender_name": message.get("sender_name", "Unknown"),
+        "content": message.get("content", ""),
+        "msg_id": message.get("msg_id", ""),
+    }
