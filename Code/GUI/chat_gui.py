@@ -516,9 +516,27 @@ class ChatGUI:
         name = info.get("name", "Peer")
         if status == "online":
             self.connection_label.configure(text=f"● Connected: {name}", foreground=self.GREEN)
-        elif status == "offline" and self.selected_peer_id == info.get("peer_id"):
-            self.peer_status_label.configure(text="○ Offline")
-            self._set_chat_enabled(False)
+            if self.selected_peer_id == info.get("peer_id"):
+                addr = info.get("address")
+                address = f"{addr[0]}:{addr[1]}" if addr else "-"
+                self.peer_status_label.configure(text=f"● {address}")
+                self._set_chat_enabled(True)
+        elif status == "offline":
+            if self.selected_peer_id == info.get("peer_id"):
+                self.peer_status_label.configure(text="○ Offline")
+                self._set_chat_enabled(False)
+            # Cập nhật lại chữ góc trên phải: nếu vẫn còn peer khác đang online thì
+            # hiển thị peer đó, nếu không còn ai online thì quay về trạng thái Listening.
+            still_online = self.peer_manager.online_peers()
+            if still_online:
+                other = still_online[0]
+                self.connection_label.configure(
+                    text=f"● Connected: {other.get('name', 'Peer')}", foreground=self.GREEN
+                )
+            else:
+                self.connection_label.configure(
+                    text=f"● Listening {self.local_ip}:{self.port}", foreground=self.GREEN
+                )
 
     def _network_error(self, message: str):
         self.root.after(0, lambda: self._show_error(message))
