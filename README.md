@@ -163,7 +163,14 @@ python Code/main.py
 
 ## Giới hạn
 
-*(Cập nhật: liệt kê rõ những gì ứng dụng chưa làm được hoặc nằm ngoài phạm vi, ví dụ: chỉ hoạt động trong cùng mạng LAN, chưa hỗ trợ kết nối qua Internet.)*
+- Ứng dụng hiện chủ yếu được sử dụng trong cùng mạng LAN/Wi-Fi để các client có thể kết nối trực tiếp với nhau.
+- Chưa hỗ trợ cơ chế máy chủ trung gian (server) để quản lý và chuyển tiếp kết nối giữa các peer.
+- Khi kết nối giữa hai máy khác nhau, người dùng cần biết chính xác địa chỉ IP và port của peer cần kết nối.
+- Chưa có cơ chế tự động phát hiện các peer trong mạng.
+- Việc kết nối có thể bị ảnh hưởng bởi Firewall hoặc các thiết lập mạng trên máy tính.
+- Chưa hỗ trợ đầy đủ kết nối trực tiếp giữa các peer qua Internet khi hai máy nằm ở các mạng khác nhau hoặc phía sau NAT.
+- Ứng dụng chưa có cơ chế xác thực và mã hóa đầu cuối (End-to-End Encryption) cho nội dung tin nhắn.
+- Khi một peer ngắt kết nối, các peer khác không thể tiếp tục gửi tin nhắn trực tiếp đến peer đó cho đến khi kết nối lại.
 
 ## Video demo
 
