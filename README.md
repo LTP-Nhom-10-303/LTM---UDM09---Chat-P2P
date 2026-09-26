@@ -174,4 +174,4 @@ python Code/main.py
 
 ## Video demo
 
-*(link video)*
+*[(link video)](https://youtu.be/CuTDafSIFmo)*
